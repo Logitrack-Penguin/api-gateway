@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    config:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+logitrack:
+  jwt:
+    secret: dGVzdC1zZWNyZXQtcGFyYS1sb2dpdHJhY2stZ2F0ZXdheS0zMmJ5dGVz
+    issuer: logitrack-security-service
