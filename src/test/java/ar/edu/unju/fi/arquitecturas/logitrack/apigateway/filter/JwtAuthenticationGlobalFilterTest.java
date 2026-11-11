@@ -167,6 +167,46 @@ class JwtAuthenticationGlobalFilterTest {
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(JwtAuthenticationGlobalFilter.HEADER_USER_ROLES)).isNull();
     }
 
+    private static String tokenConDni(String dni, String... roles) {
+        Date now = new Date();
+        return Jwts.builder()
+                .issuer(ISSUER)
+                .subject("usuario")
+                .claim("userId", "42")
+                .claim("roles", List.of(roles))
+                .claim("dni", dni)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 60_000))
+                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET)))
+                .compact();
+    }
+
+    @Test
+    void tokenConDni_propagaXUserDni() {
+        run(MockServerHttpRequest.get(COURIER + "/repartidores")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenConDni("30111222", "REPARTIDOR")).build());
+        assertThat(forwarded.get().getRequest().getHeaders().get(JwtAuthenticationGlobalFilter.HEADER_USER_DNI))
+                .containsExactly("30111222");
+    }
+
+    @Test
+    void dniFalsificado_esReemplazadoPorElDelToken() {
+        run(MockServerHttpRequest.get(COURIER + "/repartidores")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenConDni("30111222", "REPARTIDOR"))
+                .header(JwtAuthenticationGlobalFilter.HEADER_USER_DNI, "99999999").build());
+        assertThat(forwarded.get().getRequest().getHeaders().get(JwtAuthenticationGlobalFilter.HEADER_USER_DNI))
+                .containsExactly("30111222");
+    }
+
+    @Test
+    void tokenSinDni_descartaXUserDniFalsificado() {
+        run(MockServerHttpRequest.get(COURIER + "/repartidores")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + validToken("REPARTIDOR"))
+                .header(JwtAuthenticationGlobalFilter.HEADER_USER_DNI, "99999999").build());
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(JwtAuthenticationGlobalFilter.HEADER_USER_DNI))
+                .isNull();
+    }
+
     @Test
     void rutaProtegidaSinReglaCoincidente_responde403() {
         MockServerWebExchange ex = run(MockServerHttpRequest.get(SHIPMENT + "/otra-cosa")
