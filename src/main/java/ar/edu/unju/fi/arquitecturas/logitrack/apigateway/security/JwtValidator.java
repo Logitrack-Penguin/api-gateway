@@ -50,10 +50,12 @@ public class JwtValidator {
                 .getPayload();
 
         Object userId = claims.get("userId");
+        Object dni = claims.get("dni");
         AuthenticatedUser user = new AuthenticatedUser(
                 userId != null ? userId.toString() : null,
                 claims.getSubject(),
-                extractRoles(claims.get("roles")));
+                extractRoles(claims.get("roles")),
+                dni != null ? dni.toString() : null);
         log.debug("Token válido para '{}' con roles {}", user.username(), user.roles());
         return user;
     }

@@ -35,7 +35,8 @@ import java.util.Optional;
  *   <li>Extrae el token Bearer de la cabecera {@code Authorization}; si falta o es inválido responde 401.</li>
  *   <li>Autoriza según los roles del JWT y las reglas configuradas; si no corresponde responde 403.</li>
  *   <li>Delega la identidad a los microservicios mediante las cabeceras {@code X-User-Id},
- *       {@code X-User-Name} y {@code X-User-Roles}, descartando las que envíe el cliente.</li>
+ *       {@code X-User-Name}, {@code X-User-Roles} y {@code X-User-Dni} (si el token trae DNI),
+ *       descartando las que envíe el cliente.</li>
  * </ol>
  * Se ejecuta antes de los filtros de ruta (p. ej. RewritePath), por lo que evalúa la ruta externa.
  *
@@ -49,6 +50,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     public static final String HEADER_USER_ID = "X-User-Id";
     public static final String HEADER_USER_NAME = "X-User-Name";
     public static final String HEADER_USER_ROLES = "X-User-Roles";
+    /** DNI del usuario: permite a courier y shipment saber qué repartidor o cliente es (LT4-40). */
+    public static final String HEADER_USER_DNI = "X-User-Dni";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtValidator jwtValidator;
@@ -115,6 +118,9 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
                         headers.set(HEADER_USER_NAME, user.username());
                     }
                     headers.set(HEADER_USER_ROLES, String.join(",", user.roles().stream().sorted().toList()));
+                    if (user.dni() != null) {
+                        headers.set(HEADER_USER_DNI, user.dni());
+                    }
                 })
                 .build();
 
@@ -131,7 +137,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     private static ServerHttpRequest stripIdentityHeaders(ServerHttpRequest request, String method, PathContainer path) {
         HttpHeaders headers = request.getHeaders();
         if (!headers.containsHeader(HEADER_USER_ID) && !headers.containsHeader(HEADER_USER_NAME)
-                && !headers.containsHeader(HEADER_USER_ROLES)) {
+                && !headers.containsHeader(HEADER_USER_ROLES) && !headers.containsHeader(HEADER_USER_DNI)) {
             return request;
         }
         log.warn("Se descartaron cabeceras de identidad enviadas por el cliente en {} {} (posible suplantación)",
@@ -140,6 +146,7 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
             h.remove(HEADER_USER_ID);
             h.remove(HEADER_USER_NAME);
             h.remove(HEADER_USER_ROLES);
+            h.remove(HEADER_USER_DNI);
         }).build();
     }
 
